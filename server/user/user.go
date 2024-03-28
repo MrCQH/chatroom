@@ -1,4 +1,4 @@
-package server
+package user
 
 import (
 	"chatroom/utils"
@@ -13,7 +13,7 @@ type User struct {
 	UserPort           string           // 对应用户的端口号
 	Conn               net.Conn         // 对应聊天用户的链接
 	PrivateChatChannel chan string      // 对应私聊的channel
-	UserMap            map[string]*User // 拿到Server的userMap
+	UserMap            map[string]*User // 拿到Server的userMap TODO 改为每一个聊天室的Map
 }
 
 func NewUser(userName, userIP, userPort string, conn net.Conn, userMap map[string]*User) *User {
@@ -43,6 +43,6 @@ func (u *User) listenAndSendPrivateMsg() {
 }
 
 // 私聊的处理逻辑
-func (u *User) privateMsgHandler(msgBody string) {
+func (u *User) PrivateMsgHandler(msgBody string) {
 	u.PrivateChatChannel <- msgBody
 }
