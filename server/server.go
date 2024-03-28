@@ -83,9 +83,7 @@ func (c *ChatServer) msgHandle(curConn net.Conn) {
 			delete(c.userMap, remoteAddr)
 			return
 		}
-		if n != 0 {
-			c.ParseMsg(string(readBytes[0:n-1]), curConn)
-		}
+		c.ParseMsg(string(readBytes[0:n-1]), curConn)
 	}
 }
 
@@ -114,23 +112,20 @@ func (c *ChatServer) ParseMsg(msg string, curConn net.Conn) {
 	remoteAddr := curConn.RemoteAddr().String()
 	msgSplit := strings.Split(msg, "|")
 	if len(msgSplit) > FormatN {
-		utils.SendMessage(curConn, "私聊格式不对，请重新输入.\n")
+		utils.SendMessage(curConn, "你的消息格式不对，请重新输入.\n")
 		return
 	}
 	msgOption := msgSplit[0]
 	log.Println("Message option:", msgOption)
-	//if len(msgSplit) >= 2 {
-	//	log.Println("Message context:", msgSplit[1])
-	//}
 	if checkOption(msgOption) {
 		utils.SendMessage(curConn, constants.IntroduceStr)
 		return
 	}
-	if msgOption == "quit" {
+	if msgOption == constants.QuitOption {
 		remoteAddr = curConn.RemoteAddr().String()
 		utils.SendMessage(curConn, fmt.Sprintf("Bye~ %s\n", c.userMap[remoteAddr].UserName))
 		c.TerminalConnect(curConn, remoteAddr)
-	} else if msgOption == "to" {
+	} else if msgOption == constants.PrivateChatOption {
 		distUserName, msgBody := msgSplit[1], strings.Join(msgSplit[2:], "")
 		if user, isPresent := c.userMap[distUserName]; !isPresent {
 			utils.SendMessage(curConn, fmt.Sprintf("你发送的%s不存在\n", distUserName))
@@ -138,27 +133,27 @@ func (c *ChatServer) ParseMsg(msg string, curConn net.Conn) {
 		} else {
 			user.privateMsgHandler(distUserName + "#" + msgBody + "\n")
 		}
-	} else if msgOption == "broad" {
+	} else if msgOption == constants.BroadOption {
 		msgBody := strings.Join(msgSplit[1:], "") + "\n"
 		c.broadHandler(msgBody)
-	} else if msgOption == "show" {
+	} else if msgOption == constants.ShowAllOnlineUsersOption {
 		var userNames string
 		for userName := range c.userMap {
 			userNames += userName + "\n"
 		}
 		utils.SendMessage(curConn, userNames)
-	} else if msgOption == "my_name" {
+	} else if msgOption == constants.MyNameOption {
 		utils.SendMessage(curConn, fmt.Sprintf("你的名字是:%s\n", remoteAddr))
 	}
 }
 
 // 检查option操作
 func checkOption(option string) bool {
-	return option != "to" &&
-		option != "broad" &&
-		option != "show" &&
-		option != "my_name" &&
-		option != "quit"
+	return option != constants.PrivateChatOption &&
+		option != constants.BroadOption &&
+		option != constants.ShowAllOnlineUsersOption &&
+		option != constants.MyNameOption &&
+		option != constants.QuitOption
 }
 
 func (c *ChatServer) TerminalConnect(conn net.Conn, remoteAddr string) {
