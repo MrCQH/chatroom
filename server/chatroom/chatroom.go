@@ -7,24 +7,28 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 )
 
+// 聊天室的接口，实现 聊天室 必须实现该接口
+type IChatroom interface {
+	AddUserToRoom(*user.User) bool
+	MsgHandle(*user.User)
+	TerminalUserConnect(*user.User)
+}
+
 type Chatroom struct {
-	RoomId           atomic.Int64          // 房间ID, 自增的ID，atomicInt
-	UserMap          map[string]*user.User // 聊天室对应的userName(default:"IP:Port")->User 对应每个用户的map
-	usersMaxCapacity int                   // 房间的最大容量
-	BroadcastChannel chan string           // 广播的channel
-	mapLock          sync.Mutex            // 对应userMap的锁，防止并发数据访问
+	RoomId           atomic.Int64      // 房间ID, 自增的ID，atomicInt
+	UserMap          *user.SafeUserMap // 聊天室对应的userName(default:"IP:Port")->User 对应每个用户的map
+	usersMaxCapacity int               // 房间的最大容量
+	BroadcastChannel chan string       // 广播的channel
+	SignChannel      chan bool         // 房间退出的信号，判断该房间是否被删除
 }
 
 func NewChatroom() *Chatroom {
 	cr := &Chatroom{
-		UserMap:          make(map[string]*user.User),
 		usersMaxCapacity: 500,
 		BroadcastChannel: make(chan string),
 	}
@@ -38,12 +42,15 @@ func (cr *Chatroom) listenAndSendBroadMsg() {
 	for {
 		if msg, open := <-cr.BroadcastChannel; open {
 			log.Printf("%d BroadcastChannel have message: %s", cr.RoomId.Load(), msg)
-			cr.mapLock.Lock()
-			for _, user := range cr.UserMap {
-				_, err := user.Conn.Write([]byte(msg))
-				utils.CheckError(err, fmt.Sprintf("%s write", user.Conn.RemoteAddr()))
-			}
-			cr.mapLock.Unlock()
+			cr.UserMap.Range(func(key any, value any) bool {
+				u, success := value.(*user.User)
+				if !success {
+					panic("SafeUserMap 的 Value 不是*User类型")
+				}
+				_, err := u.Conn.Write([]byte(msg))
+				utils.CheckError(err, fmt.Sprintf("%s write", u.Conn.RemoteAddr()))
+				return true
+			})
 		}
 	}
 }
@@ -55,14 +62,14 @@ func (cr *Chatroom) broadHandler(msgBody string) {
 
 // 用户进入房间的逻辑, 检查并保存user, 返回当前分配 成功/失败
 func (cr *Chatroom) AddUserToRoom(user *user.User) bool {
-	cr.mapLock.Lock()
-	defer cr.mapLock.Unlock()
-	curNumberOfUser := len(cr.UserMap)
+	curNumberOfUser := cr.UserMap.Len()
 	if curNumberOfUser > cr.usersMaxCapacity {
-		utils.SendMessage(user.Conn, fmt.Sprintf("当前房间已满, 已分配到ID为%d的房间"))
+		utils.SendMessage(user.Conn, fmt.Sprintf("当前房间已满，你无法进入"))
 		return false
 	}
-	cr.UserMap[user.UserName] = user
+	utils.SendMessage(user.Conn, fmt.Sprintf("你已分配到ID为%d的房间, %d", cr.RoomId.Load()))
+	log.Printf("用户名字为%s，已分配到ID为%d的房间", user.UserName, cr.RoomId.Load())
+	cr.UserMap.SetUser(user.UserName, user)
 	return true
 }
 
@@ -79,10 +86,10 @@ func (cr *Chatroom) MsgHandle(user *user.User) {
 		if n == 0 || err == io.EOF {
 			remoteAddr := curConn.RemoteAddr().String()
 			log.Printf("%s 用户已下线\n", remoteAddr)
-			delete(cr.UserMap, remoteAddr)
+			cr.UserMap.DeleteUser(remoteAddr)
 			return
 		}
-		cr.parseMsg(string(readBytes[0:n-1]), curConn)
+		cr.parseMsg(string(readBytes[0:n-1]), user)
 	}
 }
 
@@ -90,8 +97,9 @@ func (cr *Chatroom) MsgHandle(user *user.User) {
 // <option>|<...>
 // eg: 0|<name>|<msgbody>
 // eg: 1|<msgbody>
-func (cr *Chatroom) parseMsg(msg string, curConn net.Conn) {
+func (cr *Chatroom) parseMsg(msg string, user *user.User) {
 	const FormatN = 3
+	curConn := user.Conn
 	remoteAddr := curConn.RemoteAddr().String()
 	msgSplit := strings.Split(msg, "|")
 	if len(msgSplit) > FormatN {
@@ -113,12 +121,16 @@ func (cr *Chatroom) parseMsg(msg string, curConn net.Conn) {
 
 	switch msgOption {
 	case constants.QuitOption:
-		remoteAddr = curConn.RemoteAddr().String()
-		utils.SendMessage(curConn, fmt.Sprintf("Bye~ %s\n", cr.UserMap[remoteAddr].UserName))
-		cr.TerminalConnect(curConn, remoteAddr)
+		log.Println("remoteAddr:", remoteAddr)
+		u, ok := cr.UserMap.GetUser(remoteAddr)
+		if !ok {
+			log.Panicf("SafeUserMap没有用户名为: %s的用户", u.UserName)
+		}
+		utils.SendMessage(curConn, fmt.Sprintf("Bye~ %s\n", u.UserName))
+		cr.TerminalUserConnect(user)
 	case constants.PrivateChatOption:
 		distUserName, msgBody := msgSplit[1], strings.Join(msgSplit[2:], "")
-		if curUser, isPresent := cr.UserMap[distUserName]; !isPresent {
+		if curUser, isPresent := cr.UserMap.GetUser(distUserName); !isPresent {
 			utils.SendMessage(curConn, fmt.Sprintf("你发送的%s不存在\n", distUserName))
 			return
 		} else {
@@ -129,9 +141,11 @@ func (cr *Chatroom) parseMsg(msg string, curConn net.Conn) {
 		cr.broadHandler(msgBody)
 	case constants.ShowAllOnlineUsersOption:
 		var userNames string
-		for userName := range cr.UserMap {
+		cr.UserMap.Range(func(key any, value any) bool {
+			userName := key.(string)
 			userNames += userName + "\n"
-		}
+			return true
+		})
 		utils.SendMessage(curConn, userNames)
 	case constants.MyNameOption:
 		utils.SendMessage(curConn, fmt.Sprintf("你的名字是:%s\n", remoteAddr))
@@ -146,7 +160,8 @@ func (cr *Chatroom) parseMsg(msg string, curConn net.Conn) {
 //	return option <= constants.QuitOption && option >= 0
 //}
 
-func (cr *Chatroom) TerminalConnect(conn net.Conn, remoteAddr string) {
-	delete(cr.UserMap, remoteAddr)
-	conn.Close()
+func (cr *Chatroom) TerminalUserConnect(user *user.User) {
+	cr.UserMap.DeleteUser(user.Conn.RemoteAddr().String())
+	cr.SignChannel <- true
+	user.Conn.Close()
 }

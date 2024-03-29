@@ -1,12 +1,12 @@
 package main
 
 import (
-	"chatroom/server"
+	"chatroom/server/server"
 	"flag"
 )
 
-var serverIp string
-var serverPort string
+var serverIp string   // 聊天室的IP地址
+var serverPort string // 聊天室的端口号
 
 func init() {
 	flag.StringVar(&serverIp, "i", "127.0.0.1", "聊天室的IP地址")
@@ -15,7 +15,6 @@ func init() {
 
 func main() {
 	flag.Parse()
-	//log.Println("serverIp:", serverIp, "serverPort:", serverPort)
 	chatServer := server.NewChatServer(serverIp, serverPort)
 	chatServer.Start()
 }
