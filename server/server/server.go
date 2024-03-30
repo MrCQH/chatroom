@@ -22,16 +22,13 @@ type ChatServer struct {
 
 // 创建聊天服务器
 func NewChatServer(serverIP, serverPort string) *ChatServer {
-	chatroomManager := chatroom_manager.NewChatroomManager()
 	chatServer := &ChatServer{
 		ServerIP:         serverIP,
 		ServerPort:       serverPort,
 		userMap:          user.NewSafeUserMap(),
 		EnterRoomChannel: make(chan *user.User),
-		IChatroomManager: chatroomManager,
+		IChatroomManager: chatroom_manager.NewChatroomManager(),
 	}
-
-	go chatroomManager.LogPerCheckCurAllocChatroomNumber()
 
 	go chatServer.consumEnterUser()
 
@@ -73,17 +70,20 @@ func (c *ChatServer) userEnterRoom(user *user.User) {
 	c.EnterRoomChannel <- user
 }
 
-// 作为消费者，消费 EnterRoomChannel 的用户
+// 作为消费者，消费 EnterRoomChannel 的用户，单个协程，顺序消费用户
 func (c *ChatServer) consumEnterUser() {
 	for {
 		log.Printf("尝试消费用户\n")
 		if u, open := <-c.EnterRoomChannel; open {
 			log.Printf("%s 用户被消费\n", u.Conn.RemoteAddr().String())
 			c.consumProcess(u)
+			// 增加协程的消费数
+			//go c.consumProcess(u)
 		}
 	}
 }
 
+// 消费任务的逻辑
 func (c *ChatServer) consumProcess(u *user.User) {
 	log.Println("EnterRoomUser:", u.UserName)
 	chatroomManager, ok := c.IChatroomManager.(*chatroom_manager.ChatroomManager)
@@ -93,14 +93,14 @@ func (c *ChatServer) consumProcess(u *user.User) {
 	if isFound, Ichatroom := chatroomManager.AssignRoomToUser(u); !isFound {
 		utils.SendMessage(u.Conn, "本聊天室服务器分配已满")
 		log.Println("本聊天室服务器分配已满")
-		chatroomManager.AddChatroom(chatroom.NewChatroom())
-		chatroomManager.AssignRoomToUser(u)
+		// 保证User不丢失，没来得及消费的User，重新放入 EnterRoomChannel，重新消费
+		go c.userEnterRoom(u)
 	} else {
 		cr, ok := Ichatroom.(*chatroom.Chatroom)
 		if !ok {
 			log.Panicln("*chatroom.Chatroom 没有实现 Ichatroom 接口")
 		}
-		log.Printf("已经分配聊天室，ID为%d\n", cr.RoomId.Load())
+		log.Printf("已经分配聊天室，ID:%d\n", cr.RoomId.Load())
 		go cr.MsgHandle(u)
 	}
 }

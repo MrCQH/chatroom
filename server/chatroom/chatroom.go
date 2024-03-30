@@ -2,6 +2,7 @@ package chatroom
 
 import (
 	"chatroom/constants"
+	"chatroom/parameter"
 	"chatroom/server/user"
 	"chatroom/utils"
 	"fmt"
@@ -30,7 +31,7 @@ type Chatroom struct {
 func NewChatroom() *Chatroom {
 	cr := &Chatroom{
 		UserMap:          user.NewSafeUserMap(),
-		usersMaxCapacity: 100,
+		usersMaxCapacity: parameter.UsersMaxCapacity,
 		BroadcastChannel: make(chan string),
 		SignChannel:      make(chan bool),
 	}
