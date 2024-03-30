@@ -116,10 +116,6 @@ func (cr *Chatroom) parseMsg(msg string, user *user.User) {
 	}
 
 	log.Println("Message option:", msgOption)
-	//if !cr.checkOptionCondition(msgOption) {
-	//	utils.SendMessage(curConn, constants.GetDynamicConstIntroduceStr())
-	//	return
-	//}
 
 	switch msgOption {
 	case constants.QuitOption:
@@ -156,11 +152,6 @@ func (cr *Chatroom) parseMsg(msg string, user *user.User) {
 		return
 	}
 }
-
-// 检查option操作， 满足返回true，否则返回false
-//func (cr *Chatroom) checkOptionCondition(option int) bool {
-//	return option <= constants.QuitOption && option >= 0
-//}
 
 func (cr *Chatroom) TerminalUserConnect(user *user.User) {
 	log.Printf("删除时: Id为%d的房间的UserMap地址为%p\n", cr.RoomId.Load(), cr.UserMap)

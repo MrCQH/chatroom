@@ -12,9 +12,9 @@ import (
 	"time"
 )
 
-var serverIp string        // 链接聊天室的IP地址
-var serverPort string      // 链接聊天室的端口号
-const NumberOfUser = 10000 // 测试用户数量
+var serverIp string       // 链接聊天室的IP地址
+var serverPort string     // 链接聊天室的端口号
+const NumberOfUser = 1000 // 测试用户数量
 
 func init() {
 	flag.StringVar(&serverIp, "i", "127.0.0.1", "链接聊天室的IP地址")
@@ -46,9 +46,9 @@ func main() {
 			//time.Sleep(5 * time.Second)
 			//conn.Write([]byte(fmt.Sprintf("%d|%s", 4, MsgContext)))
 		}(i)
-		if i%100 == 0 {
-			time.Sleep(100 * time.Millisecond)
-		}
+		//if i%100 == 0 {
+		//	time.Sleep(100 * time.Millisecond)
+		//}
 		//time.Sleep(100 * time.Millisecond)
 	}
 	time.Sleep(3 * time.Second)
