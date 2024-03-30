@@ -8,13 +8,19 @@ import (
 
 // 封装的sync.Map，其key为userName string ,value为User *User
 type SafeUserMap struct {
-	m   *sync.Map
+	m   *sync.Map    // username string -> *User
 	cnt atomic.Int64 //计数器
 }
 
+func NewSafeUserMap() *SafeUserMap {
+	return &SafeUserMap{
+		m: &sync.Map{},
+	}
+}
+
 func (sm *SafeUserMap) GetUser(username string) (*User, bool) {
+	log.Println("username:", username)
 	u, isPresent := sm.m.Load(username)
-	log.Println(isPresent)
 	if !isPresent {
 		return nil, false
 	}

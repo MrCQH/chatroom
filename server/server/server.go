@@ -26,6 +26,7 @@ func NewChatServer(serverIP, serverPort string) *ChatServer {
 	chatServer := &ChatServer{
 		ServerIP:         serverIP,
 		ServerPort:       serverPort,
+		userMap:          user.NewSafeUserMap(),
 		EnterRoomChannel: make(chan *user.User),
 		IChatroomManager: chatroomManager,
 	}
@@ -92,7 +93,8 @@ func (c *ChatServer) consumProcess(u *user.User) {
 	if isFound, Ichatroom := chatroomManager.AssignRoomToUser(u); !isFound {
 		utils.SendMessage(u.Conn, "本聊天室服务器分配已满")
 		log.Println("本聊天室服务器分配已满")
-		return
+		chatroomManager.AddChatroom(chatroom.NewChatroom())
+		chatroomManager.AssignRoomToUser(u)
 	} else {
 		cr, ok := Ichatroom.(*chatroom.Chatroom)
 		if !ok {

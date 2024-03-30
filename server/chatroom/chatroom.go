@@ -29,8 +29,10 @@ type Chatroom struct {
 
 func NewChatroom() *Chatroom {
 	cr := &Chatroom{
-		usersMaxCapacity: 500,
+		UserMap:          user.NewSafeUserMap(),
+		usersMaxCapacity: 100,
 		BroadcastChannel: make(chan string),
+		SignChannel:      make(chan bool),
 	}
 	cr.RoomId.Add(1)
 	go cr.listenAndSendBroadMsg()
@@ -62,8 +64,7 @@ func (cr *Chatroom) broadHandler(msgBody string) {
 
 // 用户进入房间的逻辑, 检查并保存user, 返回当前分配 成功/失败
 func (cr *Chatroom) AddUserToRoom(user *user.User) bool {
-	curNumberOfUser := cr.UserMap.Len()
-	if curNumberOfUser > cr.usersMaxCapacity {
+	if cr.UserMap.Len() >= cr.usersMaxCapacity {
 		utils.SendMessage(user.Conn, fmt.Sprintf("当前房间已满，你无法进入"))
 		return false
 	}
@@ -121,7 +122,7 @@ func (cr *Chatroom) parseMsg(msg string, user *user.User) {
 
 	switch msgOption {
 	case constants.QuitOption:
-		log.Println("remoteAddr:", remoteAddr)
+		log.Println("Quit remoteAddr:", remoteAddr)
 		u, ok := cr.UserMap.GetUser(remoteAddr)
 		if !ok {
 			log.Panicf("SafeUserMap没有用户名为: %s的用户", u.UserName)
@@ -161,7 +162,11 @@ func (cr *Chatroom) parseMsg(msg string, user *user.User) {
 //}
 
 func (cr *Chatroom) TerminalUserConnect(user *user.User) {
-	cr.UserMap.DeleteUser(user.Conn.RemoteAddr().String())
+	log.Printf("删除时: Id为%d的房间的UserMap地址为%p\n", cr.RoomId.Load(), cr.UserMap)
+	_, success := cr.UserMap.DeleteUser(user.Conn.RemoteAddr().String())
+	if !success {
+		log.Printf("username为%s的用户没有删除成功", user.UserName)
+	}
 	cr.SignChannel <- true
 	user.Conn.Close()
 }

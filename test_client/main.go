@@ -8,12 +8,13 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
 
-var serverIp string    // 链接聊天室的IP地址
-var serverPort string  // 链接聊天室的端口号
-const NumberOfUser = 1 // 测试用户数量
+var serverIp string      // 链接聊天室的IP地址
+var serverPort string    // 链接聊天室的端口号
+const NumberOfUser = 150 // 测试用户数量
 
 func init() {
 	flag.StringVar(&serverIp, "i", "127.0.0.1", "链接聊天室的IP地址")
@@ -23,10 +24,11 @@ func init() {
 // 测试 NumberOfUser 个用户，测试并发
 func main() {
 	flag.Parse()
+	var cnt atomic.Int32
 
 	for i := 0; i < NumberOfUser; i++ {
 		go func(ix int) {
-			localPort := strconv.Itoa(ix + 100000)
+			localPort := strconv.Itoa(ix + 20000)
 			localAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("127.0.0.1:%s", localPort))
 			remoteAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%s", serverIp, serverPort))
 			conn, err := net.DialTCP("tcp", localAddr, remoteAddr)
@@ -40,11 +42,14 @@ func main() {
 			//}
 			conn.Write([]byte(fmt.Sprintf("%d|%s", 1, MsgContext)))
 			log.Printf("第%d个用户发送消息成功, 端口为:%v\n", ix, localPort)
-			time.Sleep(5 * time.Second)
-			conn.Write([]byte(fmt.Sprintf("%d|%s", 4, MsgContext)))
+			cnt.Add(1)
+			//time.Sleep(5 * time.Second)
+			//conn.Write([]byte(fmt.Sprintf("%d|%s", 4, MsgContext)))
 		}(i)
 		//time.Sleep(time.Second)
 	}
+	time.Sleep(5 * time.Second)
+	log.Println("一共测试连接数量为:", cnt.Load())
 	time.Sleep(6 * 60 * time.Second)
 }
 

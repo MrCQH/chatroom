@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -30,7 +29,6 @@ type ChatroomManager struct {
 	IChatrooms             []chatroom.IChatroom  // 对应所有聊天室
 	chatroomMaxCapacity    int                   // 所有聊天室的总容量
 	OperateChatroomChannel chan *OperateChatroom // 维护聊天室的channel
-	ChatroomLock           sync.Mutex            // 增加聊天室的锁
 }
 
 func NewChatroomManager() *ChatroomManager {
@@ -84,6 +82,7 @@ func (cm *ChatroomManager) _addChatroom(IDistChatroom chatroom.IChatroom) {
 			return
 		}
 		cm.IChatrooms = append(cm.IChatrooms, distChatroom)
+		log.Printf("增加时: Id为%d的房间UserMap的地址为%p\n", distChatroom.RoomId.Load(), distChatroom.UserMap)
 		go cm.perCheckDeleteChatroom(distChatroom)
 		log.Printf("已增加ID为%d的聊天室\n", distChatroom.RoomId.Load())
 	}
@@ -102,7 +101,7 @@ func (cm *ChatroomManager) DeleteChatroom(distChatroom chatroom.IChatroom) {
 // 递归的分配房间给用户，随机进入一个已经存在的房间
 // TODO 支持断线重连
 func (cm *ChatroomManager) AssignRoomToUser(user *user.User) (bool, chatroom.IChatroom) {
-	if len(cm.IChatrooms) > cm.chatroomMaxCapacity {
+	if len(cm.IChatrooms) >= cm.chatroomMaxCapacity {
 		log.Printf("聊天室已经超过最大分配额度了，%d", len(cm.IChatrooms))
 		return false, nil
 	}
@@ -116,12 +115,11 @@ func (cm *ChatroomManager) AssignRoomToUser(user *user.User) (bool, chatroom.ICh
 	for i := 0; i < MaxNumberOfRetries; i++ {
 		chatroomIndex := rand.Intn(len(cm.IChatrooms))
 		// 防止初次没有房间，一直continue到循环外，增加房间
-		if cm.IChatrooms[chatroomIndex] == nil {
-			continue
-		}
+		//if cm.IChatrooms[chatroomIndex] == nil {
+		//	continue
+		//}
 		return cm.IChatrooms[chatroomIndex].AddUserToRoom(user), cm.IChatrooms[chatroomIndex]
 	}
-	cm.AddChatroom(chatroom.NewChatroom())
 	// 继续调用自己，去分配房间
 	return cm.AssignRoomToUser(user)
 }
@@ -133,12 +131,15 @@ func (cm *ChatroomManager) perCheckDeleteChatroom(IDistChatroom chatroom.IChatro
 		log.Panicln("*chatroom.Chatroom 没有实现 IChatroom 接口")
 	}
 	for {
+		//log.Printf("房间ID为%d 的UserMap 长度为: %d\n", distChatroom.RoomId.Load(), distChatroom.UserMap.Len())
+		//log.Println("distChatroom.SignChannel:", distChatroom.SignChannel)
 		if _, open := <-distChatroom.SignChannel; open {
 			if distChatroom.UserMap.Len() == 0 {
 				cm.DeleteChatroom(distChatroom)
 				return
 			}
 		}
+		time.Sleep(time.Second)
 	}
 
 }
@@ -150,7 +151,7 @@ func (cm *ChatroomManager) LogPerCheckCurAllocChatroomNumber() {
 		fmt.Println("The current chat room number is:", n)
 		for i := 0; i < n; i++ {
 			cr := cm.IChatrooms[i].(*chatroom.Chatroom)
-			//log.Printf("第%d个聊天室的用户数量有%d位，用户分别是%v\n", i+1, len(cr.UserMap), cr.UserMap)
+			//log.Printf("第%d个聊天室的用户数量有%d位，用户分别是%v\n", i+1, cr.UserMap.Len(), cr.UserMap)
 			log.Printf("第%d个聊天室的用户数量有%d位\n", i+1, cr.UserMap.Len())
 		}
 		time.Sleep(time.Second)
