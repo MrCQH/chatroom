@@ -13,6 +13,7 @@ const (
 
 // 聊天室进入时，并发控制的参数
 const (
-	MaxNumberOfRetries     = 100   //概率采样的重试次数 每一层随机找房间的最大重试次数
-	BlockBufferChannelSize = 10000 // 阻塞Channel的容量，也是整个聊天系统存储User的最大的容量
+	MaxNumberOfRetries = 100 //概率采样的重试次数 每一层随机找房间的最大重试次数
+	// Deprecated: 关联到 tryGetMutexSign 方法，该方法已废弃
+	//BlockBufferChannelSize = 10000 // 阻塞Channel的容量，也是整个聊天系统存储User的最大的容量
 )

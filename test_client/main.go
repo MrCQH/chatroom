@@ -12,9 +12,9 @@ import (
 	"time"
 )
 
-var serverIp string       // 链接聊天室的IP地址
-var serverPort string     // 链接聊天室的端口号
-const NumberOfUser = 1000 // 测试用户数量
+var serverIp string        // 链接聊天室的IP地址
+var serverPort string      // 链接聊天室的端口号
+const NumberOfUser = 10000 // 测试用户数量
 
 func init() {
 	flag.StringVar(&serverIp, "i", "127.0.0.1", "链接聊天室的IP地址")
@@ -40,16 +40,11 @@ func main() {
 			} else { // 广播
 				conn.Write([]byte(fmt.Sprintf("%d|%s", randv, MsgContext)))
 			}
-			//conn.Write([]byte(fmt.Sprintf("%d|%s", 1, MsgContext)))
 			log.Printf("第%d个用户发送消息成功, 端口为:%v\n", ix, localPort)
 			cnt.Add(1)
-			//time.Sleep(5 * time.Second)
+			//time.Sleep(100 * time.Millisecond)
 			//conn.Write([]byte(fmt.Sprintf("%d|%s", 4, MsgContext)))
 		}(i)
-		//if i%100 == 0 {
-		//	time.Sleep(100 * time.Millisecond)
-		//}
-		//time.Sleep(100 * time.Millisecond)
 	}
 	time.Sleep(3 * time.Second)
 	log.Println("一共测试连接数量为:", cnt.Load())

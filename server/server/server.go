@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"strings"
+	"time"
 )
 
 // 聊天服务器对象
@@ -16,7 +17,7 @@ type ChatServer struct {
 	ServerIP         string                            // 服务器对应的IP
 	ServerPort       string                            // 服务器对应的端口号
 	userMap          *user.SafeUserMap                 // userName(default:"IP:Port")->*User 对应每个用户的map
-	EnterRoomChannel chan *user.User                   // 进入房间的channel
+	EnterRoomChannel chan *user.User                   // 进入房间的channel，顺序处理每一个用户的连接，可以增加buffer cap去增加用户并发连接数
 	IChatroomManager chatroom_manager.IChatroomManager // 该服务器对应的 IChatroomManager
 }
 
@@ -26,8 +27,8 @@ func NewChatServer(serverIP, serverPort string) *ChatServer {
 		ServerIP:         serverIP,
 		ServerPort:       serverPort,
 		userMap:          user.NewSafeUserMap(),
-		EnterRoomChannel: make(chan *user.User),
-		IChatroomManager: chatroom_manager.NewChatroomManager(),
+		EnterRoomChannel: make(chan *user.User),                  //可以增加buffer cap去增加用户并发连接数
+		IChatroomManager: chatroom_manager.NewChatroomManager(0), // 目前只有一个manager去管理
 	}
 
 	go chatServer.consumEnterUser()
@@ -43,9 +44,10 @@ func (c *ChatServer) Start() {
 	utils.CheckError(err, "Listener", listener)
 	for {
 		conn, err := listener.Accept()
+		//log.Printf("-----------------------Remote connect info: %s-----------------------\n", conn.RemoteAddr().String())
 		utils.CheckError(err, "Accept", conn)
 		curUser := c.storeUser(conn)
-		c.userEnterRoom(curUser)
+		go c.userEnterRoom(curUser)
 	}
 }
 
@@ -77,30 +79,34 @@ func (c *ChatServer) consumEnterUser() {
 		if u, open := <-c.EnterRoomChannel; open {
 			log.Printf("%s 用户被消费\n", u.Conn.RemoteAddr().String())
 			c.consumProcess(u)
-			// 增加协程的消费数
-			//go c.consumProcess(u)
 		}
 	}
 }
 
 // 消费任务的逻辑
+// 如果消费成功，就开一个协程处理
+// 如果消费失败，就进行将消息
 func (c *ChatServer) consumProcess(u *user.User) {
 	log.Println("EnterRoomUser:", u.UserName)
 	chatroomManager, ok := c.IChatroomManager.(*chatroom_manager.ChatroomManager)
 	if !ok {
 		log.Panicln("*chatroom.Chatroom 没有实现 IChatroom 接口")
 	}
-	if isFound, Ichatroom := chatroomManager.AssignRoomToUser(u); !isFound {
-		utils.SendMessage(u.Conn, "本聊天室服务器分配已满")
-		log.Println("本聊天室服务器分配已满")
+	if isFound, IChatroom := chatroomManager.AssignRoomToUser(u); !isFound {
+		utils.SendMessage(u.Conn, "本聊天室服务器分配已满或是没有分配到房间")
+		log.Println("本聊天室服务器分配已满或是没有分配到房间")
 		// 保证User不丢失，没来得及消费的User，重新放入 EnterRoomChannel，重新消费
 		go c.userEnterRoom(u)
 	} else {
-		cr, ok := Ichatroom.(*chatroom.Chatroom)
+		cr, ok := IChatroom.(*chatroom.Chatroom)
 		if !ok {
 			log.Panicln("*chatroom.Chatroom 没有实现 Ichatroom 接口")
 		}
-		log.Printf("已经分配聊天室，ID:%d\n", cr.RoomId.Load())
-		go cr.MsgHandle(u)
+		log.Printf("已经分配聊天室，ID:%d\n", cr.RoomId)
+		//go cr.MsgHandle(u)
+		go func() {
+			log.Println("有一个协程进来了")
+			time.Sleep(60 * time.Second)
+		}()
 	}
 }
