@@ -3,7 +3,6 @@ package parameter
 // ChatroomManager 相关参数
 const (
 	ChatroomMaxCapacity = 100 // 一个 ChatroomManager 管理的最大聊天室容量
-
 )
 
 // Chatroom 相关参数
