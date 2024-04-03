@@ -14,7 +14,7 @@ type User struct {
 	UserPort           string       // 对应用户的端口号
 	Conn               net.Conn     // 对应聊天用户的链接
 	PrivateChatChannel chan string  // 对应私聊的channel
-	UserMap            *SafeUserMap // 每一个聊天室的Map
+	UserMap            *SafeUserMap // 每一个聊天室的Map TODO 需要修改
 }
 
 func NewUser(userName, userIP, userPort string, conn net.Conn, userMap *SafeUserMap) *User {

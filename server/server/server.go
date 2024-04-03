@@ -1,11 +1,15 @@
 package server
 
 import (
+	"chatroom/parameter"
 	"chatroom/server/chatroom"
 	"chatroom/server/chatroom_manager"
 	"chatroom/server/user"
 	"chatroom/utils"
+	"context"
 	"fmt"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"net"
 	"strings"
@@ -14,11 +18,12 @@ import (
 
 // 聊天服务器对象
 type ChatServer struct {
-	ServerIP         string                            // 服务器对应的IP
-	ServerPort       string                            // 服务器对应的端口号
-	userMap          *user.SafeUserMap                 // userName(default:"IP:Port")->*User 对应每个用户的map
-	EnterRoomChannel chan *user.User                   // 进入房间的channel，顺序处理每一个用户的连接，可以增加buffer cap去增加用户并发连接数
-	IChatroomManager chatroom_manager.IChatroomManager // 该服务器对应的 IChatroomManager
+	ServerIP          string                            // 服务器对应的IP
+	ServerPort        string                            // 服务器对应的端口号
+	userMap           *user.SafeUserMap                 // userName(default:"IP:Port")->*User 对应每个用户的map
+	EnterRoomChannel  chan *user.User                   // 进入房间的channel，顺序处理每一个用户的连接，可以增加buffer cap去增加用户并发连接数
+	IChatroomManager  chatroom_manager.IChatroomManager // 该服务器对应的 IChatroomManager
+	userMongoDatabase *mongo.Database                   // mongo中User数据库
 }
 
 // 创建聊天服务器
@@ -27,13 +32,39 @@ func NewChatServer(serverIP, serverPort string) *ChatServer {
 		ServerIP:         serverIP,
 		ServerPort:       serverPort,
 		userMap:          user.NewSafeUserMap(),
-		EnterRoomChannel: make(chan *user.User),                  //可以增加buffer cap去增加用户并发连接数
+		EnterRoomChannel: make(chan *user.User),                  //可以增加buffer cap去增加用户并发连接数(生产者)
 		IChatroomManager: chatroom_manager.NewChatroomManager(0), // 目前只有一个manager去管理
 	}
 
+	database, err := connectToMongo(parameter.DatabaseUrl, parameter.DatabaseName,
+		parameter.Timeout, parameter.DatabaseConnectPoolSize)
+	if err != nil {
+		log.Println("数据库连接失败", err)
+		return nil
+	}
+	chatServer.userMongoDatabase = database
 	go chatServer.consumEnterUser()
 
 	return chatServer
+}
+
+// 连接到数据库，如何设置 poolSize 参数，默认选用 poolSize最后一个参数作为连接池的大小
+func connectToMongo(url, databaseName string, timeout time.Duration, connPoolSize ...uint64) (*mongo.Database, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	o := options.Client().ApplyURI(url)
+	if len(connPoolSize) != 0 {
+		o.SetMaxConnecting(connPoolSize[len(connPoolSize)-1])
+	}
+	client, err := mongo.Connect(ctx, o)
+	if utils.CheckError(err, "client") {
+		return nil, err
+	}
+	log.Printf("已成功连接数据库:\n"+
+		"                      url为:%s\n"+
+		"                      databaseName为:%s\n"+
+		"                      连接池大小为:%d\n", url, databaseName, connPoolSize)
+	return client.Database(databaseName), nil
 }
 
 // 监听对应端口，执行handle

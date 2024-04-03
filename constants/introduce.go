@@ -11,11 +11,11 @@ var (
 )
 
 func init() {
-	GetDynamicConstIntroduceStr()
+	DynamicConstIntroduceStr()
 }
 
 // 认为动态定义，不能修改的伪常量
-func GetDynamicConstIntroduceStr() string {
+func DynamicConstIntroduceStr() string {
 	once.Do(func() {
 		introduceStr = fmt.Sprintf(
 			"当前仅支持私、广播、查看当前聊天室成员、展示我的名字和退出.\n"+

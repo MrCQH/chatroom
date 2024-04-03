@@ -53,11 +53,11 @@ func main() {
 
 // 生成指定长度的随机字符串
 func generateRandomString(length int) string {
-	letters := "qwertyuioplkjhgfdsazxcvbnmQWERTYUIOPLKJHGFDSAZXCVBNM"
+	tStr := "qwertyuioplkjhgfdsazxcvbnmQWERTYUIOPLKJHGFDSAZXCVBNM"
 	var resStr string
 	for i := 0; i < length; i++ {
-		index := rand.Intn(len(letters))
-		resStr += string(letters[index])
+		index := rand.Intn(len(tStr))
+		resStr += string(tStr[index])
 	}
 	return resStr
 }

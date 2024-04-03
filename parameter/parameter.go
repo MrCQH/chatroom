@@ -1,5 +1,15 @@
 package parameter
 
+import "time"
+
+// Mongo连接的相关的参数
+const (
+	DatabaseUrl             = "mongodb://localhost:27017" // 数据连接的url
+	DatabaseName            = "runoob"                    // 对应数据库名称
+	DatabaseConnectPoolSize = 500                         // 数据库连接池大小
+	Timeout                 = 20 * time.Second            // 连接的超时时间
+)
+
 // ChatroomManager 相关参数
 const (
 	ChatroomMaxCapacity = 100 // 一个 ChatroomManager 管理的最大聊天室容量

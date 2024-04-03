@@ -111,15 +111,15 @@ func (cr *Chatroom) parseMsg(msg string, user *user.User) {
 	remoteAddr := curConn.RemoteAddr().String()
 	msgSplit := strings.Split(msg, "|")
 	if len(msgSplit) > FormatN {
-		utils.SendMessage(curConn, "你的消息格式不对，请重新输入.\n"+constants.GetDynamicConstIntroduceStr())
-		log.Println(curConn, "你的消息格式不对，请重新输入.\n"+constants.GetDynamicConstIntroduceStr())
+		utils.SendMessage(curConn, "你的消息格式不对，请重新输入.\n"+constants.DynamicConstIntroduceStr())
+		log.Println(curConn, "你的消息格式不对，请重新输入.\n"+constants.DynamicConstIntroduceStr())
 		return
 	}
 	// 不是正确的option格式
 	msgOption, err := strconv.Atoi(msgSplit[0])
 	if utils.CheckError(err, "Strconv.Atoi") {
-		utils.SendMessage(curConn, "你的消息格式不对，请重新输入.\n"+constants.GetDynamicConstIntroduceStr())
-		log.Println(curConn, "你的消息格式不对，请重新输入.\n"+constants.GetDynamicConstIntroduceStr())
+		utils.SendMessage(curConn, "你的消息格式不对，请重新输入.\n"+constants.DynamicConstIntroduceStr())
+		log.Println(curConn, "你的消息格式不对，请重新输入.\n"+constants.DynamicConstIntroduceStr())
 		return
 	}
 
@@ -156,8 +156,8 @@ func (cr *Chatroom) parseMsg(msg string, user *user.User) {
 	case constants.MyNameOption:
 		utils.SendMessage(curConn, fmt.Sprintf("你的名字是:%s\n", remoteAddr))
 	default: // 格式不对，返回重新输入
-		utils.SendMessage(curConn, constants.GetDynamicConstIntroduceStr())
-		log.Println(curConn, constants.GetDynamicConstIntroduceStr())
+		utils.SendMessage(curConn, constants.DynamicConstIntroduceStr())
+		log.Println(curConn, constants.DynamicConstIntroduceStr())
 		return
 	}
 }
