@@ -2,6 +2,12 @@ package parameter
 
 import "time"
 
+// 消息记录环的相关参数
+
+const (
+	RingMaxCapacity = 500 // 消息存储容量
+)
+
 // Mongo连接的相关的参数
 const (
 	DatabaseUrl             = "mongodb://localhost:27017" // 数据连接的url

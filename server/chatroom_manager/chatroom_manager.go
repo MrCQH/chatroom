@@ -30,6 +30,7 @@ type ChatroomManager struct {
 	IChatrooms             []chatroom.IChatroom  // 对应所有聊天室
 	chatroomMaxCapacity    int                   // 所有聊天室的总容量
 	OperateChatroomChannel chan *OperateChatroom // 维护聊天室的channel
+	//MsgRecordRingMap
 
 	// --------------------------Deprecated field---------------------------------------------
 	// Deprecated: 关联到 sendMutexChannelSign 方法，该方法已废弃
