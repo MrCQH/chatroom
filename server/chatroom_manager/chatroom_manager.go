@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -30,7 +31,7 @@ type ChatroomManager struct {
 	IChatrooms             []chatroom.IChatroom  // 对应所有聊天室
 	chatroomMaxCapacity    int                   // 所有聊天室的总容量
 	OperateChatroomChannel chan *OperateChatroom // 维护聊天室的channel
-	//MsgRecordRingMap
+	MsgRecordRingMap       sync.Map              // 维护了一个线程安全的 roomId -> msg record
 
 	// --------------------------Deprecated field---------------------------------------------
 	// Deprecated: 关联到 sendMutexChannelSign 方法，该方法已废弃
